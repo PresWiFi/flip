@@ -7,7 +7,7 @@ Personal use, sideloaded. Not for the Play Store (it uses device admin, an acces
 ## What it does
 
 **Home screen** (Flip settings → Look)
-- **Razr V3**: blue pixel-font screen with signal and battery bars, a hinge, and an etched metal keypad with blue backlit keys. The left soft key opens search, the center key opens the main menu, and the right soft key opens Flip settings. The green key dials and the red key goes back to the idle screen.
+- **Razr V3**: the open phone in silver, black or pink, with an earpiece slot, a barrel hinge, a blue pixel-font screen, and a flat etched keypad with blue backlit symbols. The left soft key opens search and the right one opens Flip settings. The menu key and the center of the 5-way ring open the main menu, the ring moves the highlight through the menu and search results, the green key dials, C clears, and the red key goes back to the idle screen.
 - **V3 + outer screen**: starts "closed", showing a small outer display with the time and battery. Tap or swipe up to open it. It closes again when the screen turns off.
 - **Modern**: the same blue colors on a normal touch home screen.
 - **Keypad**: dial + T9 search for apps and contacts (4-6-7 finds Instagram), dial only, or no keypad. With no keypad, the Search soft key brings one up.

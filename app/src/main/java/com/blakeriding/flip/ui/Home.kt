@@ -7,6 +7,7 @@ import android.os.BatteryManager
 import android.telephony.TelephonyManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
@@ -39,11 +40,14 @@ class HomeNav {
     var open by mutableStateOf(false)
     /** Main-menu slot being changed (long-press), or -1. */
     var picking by mutableStateOf(-1)
+    /** Highlighted item for the navigation ring: a menu slot or a search result. */
+    var sel by mutableIntStateOf(0)
 
     fun home() {
         screen = Screen.IDLE
         digits = ""
         picking = -1
+        sel = 0
     }
 
     fun back() {
@@ -51,14 +55,22 @@ class HomeNav {
             digits.isNotEmpty() -> digits = ""
             screen != Screen.IDLE -> screen = Screen.IDLE
         }
+        sel = 0
+    }
+
+    fun menu() {
+        screen = if (screen == Screen.MENU) Screen.IDLE else Screen.MENU
+        sel = 0
     }
 
     fun type(c: Char) {
         if (digits.length < 32) digits += c
+        sel = 0
     }
 
     fun erase() {
         digits = digits.dropLast(1)
+        sel = 0
     }
 }
 

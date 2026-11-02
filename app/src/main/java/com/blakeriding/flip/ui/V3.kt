@@ -31,6 +31,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -65,11 +67,6 @@ class HomeActions(
     val settings: () -> Unit,
 )
 
-private val MetalTop = Color(0xFF4A505A)
-private val MetalBottom = Color(0xFF23272E)
-private val Groove = Color(0xFF0E1013)
-private val Glow = TextStyle(color = Backlight, shadow = Shadow(Backlight, Offset.Zero, 14f), fontWeight = FontWeight.Medium)
-
 /** The open V3: screen on top, hinge, etched metal keypad below. With [outer], it starts closed. */
 @Composable
 fun V3Phone(ui: HomeUi, nav: HomeNav, actions: HomeActions, outer: Boolean) {
@@ -82,56 +79,10 @@ fun V3Phone(ui: HomeUi, nav: HomeNav, actions: HomeActions, outer: Boolean) {
     }
 }
 
-@Composable
-private fun OpenPhone(ui: HomeUi, nav: HomeNav, actions: HomeActions) {
-    val digitsOn = ui.keypadOn(nav.screen)
-    Column(
-        Modifier.fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Color(0xFF2B3038), Color(0xFF15181D))))
-            .statusBarsPadding().navigationBarsPadding(),
-    ) {
-        // Top half: the screen in its bezel.
-        Box(Modifier.fillMaxWidth().weight(if (digitsOn) 0.5f else 0.8f).padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 10.dp)) {
-            Box(
-                Modifier.fillMaxSize().clip(RoundedCornerShape(14.dp)).background(Color.Black).padding(7.dp)
-                    .clip(RoundedCornerShape(6.dp)),
-            ) { Lcd(ui, nav, actions) }
-        }
-        Hinge()
-        // Bottom half: keypad plate.
-        Column(
-            Modifier.fillMaxWidth().weight(if (digitsOn) 0.5f else 0.2f).padding(horizontal = 14.dp, vertical = 10.dp)
-                .clip(RoundedCornerShape(18.dp))
-                .background(Brush.verticalGradient(listOf(MetalTop, MetalBottom)))
-                .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(18.dp))
-                .padding(10.dp),
-        ) {
-            NavKeys(ui, nav, actions, Modifier.weight(if (digitsOn) 2f else 1f))
-            if (digitsOn) DigitKeys(Modifier.weight(4f)) { c ->
-                if (nav.screen == Screen.MENU && c in '1'..'9') {
-                    ui.settings.favorites.getOrNull(c - '1')?.let(actions.open)
-                } else {
-                    if (nav.screen == Screen.MENU) nav.screen = Screen.IDLE
-                    nav.type(c)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun Hinge() {
-    Box(
-        Modifier.fillMaxWidth().height(16.dp).padding(horizontal = 6.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(Brush.verticalGradient(listOf(Color(0xFF111316), Color(0xFF5A606A), Color(0xFF16181C)))),
-    )
-}
-
 // ---------- Screen ----------
 
 @Composable
-private fun Lcd(ui: HomeUi, nav: HomeNav, actions: HomeActions) {
+internal fun Lcd(ui: HomeUi, nav: HomeNav, actions: HomeActions) {
     Box(Modifier.fillMaxSize()) {
         V3Wallpaper(Modifier.fillMaxSize())
         Column(Modifier.fillMaxSize()) {
@@ -149,7 +100,7 @@ private fun Lcd(ui: HomeUi, nav: HomeNav, actions: HomeActions) {
                 left = if (nav.screen == Screen.IDLE && nav.digits.isEmpty()) "Search" else "Back",
                 right = "Flip",
                 onLeft = { if (nav.screen == Screen.IDLE && nav.digits.isEmpty()) nav.screen = Screen.SEARCH else nav.back() },
-                onMenu = { nav.screen = if (nav.screen == Screen.MENU) Screen.IDLE else Screen.MENU },
+                onMenu = { nav.menu() },
                 onRight = actions.settings,
             )
         }
@@ -213,13 +164,18 @@ private fun BigNumber(digits: String) {
 @Composable
 private fun Results(ui: HomeUi, nav: HomeNav, actions: HomeActions) {
     val results = t9Results(nav.digits, ui.apps, ui.contacts)
+    val list = rememberLazyListState()
+    LaunchedEffect(nav.sel) {
+        val visible = list.layoutInfo.visibleItemsInfo
+        if (visible.isNotEmpty() && (nav.sel < visible.first().index || nav.sel > visible.last().index)) list.animateScrollToItem(nav.sel)
+    }
     Column(Modifier.fillMaxSize()) {
-        LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+        LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = list) {
             itemsIndexed(results) { i, m ->
                 val v = m.pkg?.let { ui.verdict(it) }
                 Row(
                     Modifier.fillMaxWidth()
-                        .background(if (i == 0) Color(0x55FFFFFF) else Color.Transparent)
+                        .background(if (i == nav.sel) Color(0x55FFFFFF) else Color.Transparent)
                         .clickable { if (m.pkg != null) actions.open(m.pkg) else m.contact?.let { actions.dial(it.number) } }
                         .padding(horizontal = 6.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -247,12 +203,15 @@ private fun MenuGrid(ui: HomeUi, nav: HomeNav, actions: HomeActions) {
         Box(
             Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color(0xFF3A8DFF), Color(0xFF0A3E9A)))).padding(5.dp),
             contentAlignment = Alignment.Center,
-        ) { PixelText("Main Menu", px = 1.75.dp) }
+        ) {
+            val pkg = ui.settings.favorites.getOrNull(nav.sel)
+            PixelText(pkg?.let { p -> ui.apps.find { it.pkg == p }?.label } ?: "Main Menu", px = 1.75.dp, maxChars = 20)
+        }
         for (row in 0 until 3) {
             Row(Modifier.weight(1f).fillMaxWidth()) {
                 for (col in 0 until 3) {
                     val slot = row * 3 + col
-                    MenuCell(ui, ui.settings.favorites.getOrNull(slot), slot, Modifier.weight(1f).fillMaxHeight(), onOpen = actions.open) {
+                    MenuCell(ui, ui.settings.favorites.getOrNull(slot), slot, slot == nav.sel, Modifier.weight(1f).fillMaxHeight(), onOpen = actions.open) {
                         nav.picking = slot
                     }
                 }
@@ -262,14 +221,15 @@ private fun MenuGrid(ui: HomeUi, nav: HomeNav, actions: HomeActions) {
 }
 
 @Composable
-private fun MenuCell(ui: HomeUi, pkg: String?, slot: Int, modifier: Modifier, onOpen: (String) -> Unit, onPick: () -> Unit) {
+private fun MenuCell(ui: HomeUi, pkg: String?, slot: Int, selected: Boolean, modifier: Modifier, onOpen: (String) -> Unit, onPick: () -> Unit) {
     val src = androidx.compose.runtime.remember { MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()
     Column(
         modifier
             .padding(3.dp)
             .clip(RoundedCornerShape(6.dp))
-            .background(if (pressed) Color(0x66FFC94A) else Color.Transparent)
+            .background(if (pressed || selected) Color(0x40FFFFFF) else Color.Transparent)
+            .border(1.5.dp, if (selected) Color.White else Color.Transparent, RoundedCornerShape(6.dp))
             .combinedClickable(interactionSource = src, indication = null, onLongClick = onPick) { if (pkg != null) onOpen(pkg) else onPick() },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -310,110 +270,32 @@ private fun SoftBar(left: String, right: String, onLeft: () -> Unit, onMenu: () 
     }
 }
 
-/** The menu key symbol: a small 3x3 grid. */
-@Composable
-private fun MenuGlyph(color: Color, px: Dp) {
-    Canvas(Modifier.size(px * 7, px * 7)) {
-        val p = px.toPx()
-        for (y in 0 until 3) for (x in 0 until 3) drawRect(color, Offset(x * 3 * p, y * 3 * p), Size(p * 1.6f, p * 1.6f))
-    }
-}
-
-// ---------- Keypad ----------
-
-@Composable
-private fun NavKeys(ui: HomeUi, nav: HomeNav, actions: HomeActions, modifier: Modifier) {
-    Column(modifier.fillMaxWidth()) {
-        Row(Modifier.weight(1f).fillMaxWidth()) {
-            Key(Modifier.weight(1f), onClick = { if (nav.screen == Screen.IDLE && nav.digits.isEmpty()) nav.screen = Screen.SEARCH else nav.back() }) { SoftDash() }
-            Key(Modifier.weight(1f), onClick = { nav.screen = if (nav.screen == Screen.MENU) Screen.IDLE else Screen.MENU }) { MenuGlyph(Backlight, 2.5.dp) }
-            Key(Modifier.weight(1f), onClick = actions.settings) { SoftDash() }
-        }
-        Row(Modifier.weight(1f).fillMaxWidth()) {
-            Key(Modifier.weight(1f), onClick = { actions.dial(nav.digits) }) {
-                Icon(Icons.Default.Call, "Call", tint = Color(0xFF5CFF8A), modifier = Modifier.size(22.dp))
-            }
-            Key(Modifier.weight(1f), onClick = { nav.erase() }, onLong = { nav.digits = "" }) { Text("C", style = Glow, fontSize = 20.sp) }
-            Key(Modifier.weight(1f), onClick = {
-                nav.home()
-                if (ui.settings.look == Look.V3_OUTER) nav.open = false
-            }) {
-                Icon(Icons.Default.Call, "End", tint = Color(0xFFFF5C5C), modifier = Modifier.size(22.dp).rotate(135f))
-            }
-        }
-    }
-}
-
-private val DIGITS = listOf("1" to "", "2" to "ABC", "3" to "DEF", "4" to "GHI", "5" to "JKL", "6" to "MNO", "7" to "PQRS", "8" to "TUV", "9" to "WXYZ", "*" to "", "0" to "+", "#" to "")
-
-@Composable
-private fun DigitKeys(modifier: Modifier, onDigit: (Char) -> Unit) {
-    Column(modifier.fillMaxWidth()) {
-        for (row in DIGITS.chunked(3)) {
-            Row(Modifier.weight(1f).fillMaxWidth()) {
-                for ((d, letters) in row) {
-                    Key(Modifier.weight(1f), onClick = { onDigit(d[0]) }, onLong = if (d == "0") ({ onDigit('+') }) else null) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(d, style = Glow, fontSize = 24.sp)
-                            if (letters.isNotEmpty()) {
-                                Spacer(Modifier.width(5.dp))
-                                Text(letters, style = Glow, fontSize = 10.sp)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/** One etched key: a groove around it and a blue backlit label that brightens when pressed. */
-@Composable
-private fun RowScope.Key(modifier: Modifier, onClick: () -> Unit, onLong: (() -> Unit)? = null, label: @Composable () -> Unit) {
-    val view = LocalView.current
-    val src = androidx.compose.runtime.remember { MutableInteractionSource() }
-    val pressed by src.collectIsPressedAsState()
-    Box(
-        modifier.fillMaxHeight().padding(2.dp)
-            .clip(RoundedCornerShape(6.dp))
-            .background(
-                if (pressed) Brush.verticalGradient(listOf(Color(0xFF2E4A66), Color(0xFF1E2C3C)))
-                else Brush.verticalGradient(listOf(Color(0xFF444A54), Color(0xFF2C3139))),
-            )
-            .border(1.dp, Groove, RoundedCornerShape(6.dp))
-            .combinedClickable(
-                interactionSource = src, indication = null,
-                onLongClick = onLong?.let { f -> { view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS); f() } },
-            ) {
-                view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-                onClick()
-            },
-        contentAlignment = Alignment.Center,
-    ) { label() }
-}
-
-@Composable
-private fun SoftDash() {
-    Box(Modifier.width(28.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(Backlight))
-}
-
 // ---------- Closed (outer screen) ----------
 
 @Composable
 private fun OuterScreen(ui: HomeUi, onOpen: () -> Unit) {
+    val f = finish(ui.settings.v3Color)
     Box(
-        Modifier.fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Color(0xFF3A3F47), Color(0xFF1A1D22), Color(0xFF2A2E35))))
+        Modifier.fillMaxSize().background(Color.Black)
+            .statusBarsPadding().navigationBarsPadding().padding(6.dp)
+            .clip(RoundedCornerShape(36.dp))
+            .background(Brush.verticalGradient(f.frame))
             .clickable(onClick = onOpen)
-            .pointerInput(Unit) { detectVerticalDragGestures { _, drag -> if (drag < -12) onOpen() } }
-            .statusBarsPadding().navigationBarsPadding(),
+            .pointerInput(Unit) { detectVerticalDragGestures { _, drag -> if (drag < -12) onOpen() } },
     ) {
         Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Spacer(Modifier.weight(0.35f))
+            Spacer(Modifier.weight(0.22f))
+            // Camera lens.
+            Box(
+                Modifier.size(34.dp).clip(CircleShape)
+                    .background(Brush.radialGradient(listOf(Color(0xFF3A4A66), Color(0xFF0A0D12))))
+                    .border(3.dp, f.frame[2], CircleShape),
+            )
+            Spacer(Modifier.height(22.dp))
             // The small outside display.
             Box(
                 Modifier.width(190.dp).height(120.dp).clip(RoundedCornerShape(12.dp))
-                    .background(Color.Black).border(2.dp, Color(0xFF55595F), RoundedCornerShape(12.dp)).padding(10.dp),
+                    .background(Color.Black).border(2.dp, f.groove, RoundedCornerShape(12.dp)).padding(10.dp),
             ) {
                 Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -434,15 +316,8 @@ private fun OuterScreen(ui: HomeUi, onOpen: () -> Unit) {
                     Spacer(Modifier.weight(1f))
                 }
             }
-            Spacer(Modifier.height(28.dp))
-            // Camera lens.
-            Box(
-                Modifier.size(34.dp).clip(CircleShape)
-                    .background(Brush.radialGradient(listOf(Color(0xFF3A4A66), Color(0xFF0A0D12))))
-                    .border(3.dp, Color(0xFF5A6068), CircleShape),
-            )
             Spacer(Modifier.weight(0.65f))
-            PixelText("Tap to open", px = 1.5.dp, color = Color(0x88FFFFFF), shadow = null)
+            PixelText("Tap to open", px = 1.5.dp, color = f.groove, shadow = null)
             Spacer(Modifier.height(24.dp))
         }
     }

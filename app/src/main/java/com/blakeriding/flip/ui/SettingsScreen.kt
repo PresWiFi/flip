@@ -63,6 +63,7 @@ import com.blakeriding.flip.Store
 import com.blakeriding.flip.Tag
 import com.blakeriding.flip.TagKind
 import com.blakeriding.flip.Usage
+import com.blakeriding.flip.V3Color
 import com.blakeriding.flip.adminIntent
 import com.blakeriding.flip.batteryIntent
 import com.blakeriding.flip.fmtDuration
@@ -223,6 +224,11 @@ fun SettingsScreen(state: AppState, nfc: SharedFlow<String>, modifier: Modifier 
 
         SectionTitle("Look")
         Choice("Style", listOf(Look.V3 to "Razr V3", Look.V3_OUTER to "V3 + outer screen", Look.MODERN to "Modern"), s.look) { l -> settings { it.copy(look = l) } }
+        if (s.look != Look.MODERN) {
+            Choice("V3 color", listOf(V3Color.SILVER to "Silver", V3Color.BLACK to "Black", V3Color.PINK to "Pink"), s.v3Color) { c ->
+                settings { it.copy(v3Color = c) }
+            }
+        }
         Choice("Keypad on the home screen", listOf(KeypadMode.T9 to "Dial + T9 search", KeypadMode.DIAL to "Dial only", KeypadMode.NONE to "None"), s.keypad) { k ->
             settings { it.copy(keypad = k) }
         }

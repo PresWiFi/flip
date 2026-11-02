@@ -80,6 +80,14 @@ class ScreensTest {
         V3Phone(ui(state.copy(settings = state.settings.copy(keypad = KeypadMode.NONE))), HomeNav(), actions, outer = false)
     }
 
+    @Test fun v3Black() = shot("v3-black") {
+        V3Phone(ui(state.copy(settings = state.settings.copy(v3Color = V3Color.BLACK))), HomeNav().apply { screen = Screen.MENU; sel = 4 }, actions, outer = false)
+    }
+
+    @Test fun v3Pink() = shot("v3-pink") {
+        V3Phone(ui(state.copy(settings = state.settings.copy(v3Color = V3Color.PINK))), HomeNav(), actions, outer = false)
+    }
+
     @Test fun v3Outer() = shot("v3-outer") { V3Phone(ui(), HomeNav(), actions, outer = true) }
 
     @Test fun modern() = shot("modern") { ModernHome(ui(), HomeNav(), actions) }

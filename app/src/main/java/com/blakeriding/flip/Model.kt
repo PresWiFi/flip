@@ -56,6 +56,10 @@ data class LogEvent(val at: Long, val kind: LogKind, val detail: String = "")
 @Serializable
 enum class Look { V3, MODERN, V3_OUTER }
 
+/** The V3's finishes. */
+@Serializable
+enum class V3Color { SILVER, BLACK, PINK }
+
 @Serializable
 enum class KeypadMode {
     /** Digits dial, and also search apps and contacts by T9. */
@@ -69,6 +73,7 @@ enum class KeypadMode {
 @Serializable
 data class Settings(
     val look: Look = Look.V3,
+    val v3Color: V3Color = V3Color.SILVER,
     val keypad: KeypadMode = KeypadMode.T9,
     /** The 9 main-menu slots: a package name, or null for an empty slot. */
     val favorites: List<String?> = List(9) { null },
