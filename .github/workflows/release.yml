@@ -1,0 +1,52 @@
+# Push a tag like v0.2.0 (matching versionName in app/build.gradle.kts) to build, test and publish a release.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Check the tag matches the app version
+        run: |
+          VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME doesn't match versionName $VERSION"; exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Android SDK platform
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" > /dev/null
+
+      - name: Release key
+        env:
+          KEYSTORE_B64: ${{ secrets.FLIP_KEYSTORE_B64 }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/flip.jks"
+          echo "FLIP_KEYSTORE=$RUNNER_TEMP/flip.jks" >> "$GITHUB_ENV"
+
+      - name: Test and build
+        env:
+          FLIP_KEYSTORE_PASSWORD: ${{ secrets.FLIP_KEYSTORE_PASSWORD }}
+        run: ./gradlew --no-daemon testDebugUnitTest assembleRelease
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk "Flip-$VERSION.apk"
+          NOTES=release-notes/$GITHUB_REF_NAME.md
+          if [ -f "$NOTES" ]; then ARGS=(--notes-file "$NOTES"); else ARGS=(--generate-notes); fi
+          gh release create "$GITHUB_REF_NAME" "Flip-$VERSION.apk" --title "Flip $VERSION" "${ARGS[@]}"

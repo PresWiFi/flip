@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Flip</string>
+    <string name="accessibility_description">Locks the apps you\'ve blocked, however they\'re opened, and stops Flip from being uninstalled, force-stopped or switched off while protection is on.</string>
+    <string name="admin_description">Prevents uninstalling Flip while protection is on.</string>
+    <string name="admin_disable_warning">This turns off Flip\'s uninstall lock.</string>
+    <string name="protected_toast">Flip is protected. Turn protection off in Flip first.</string>
+</resources>
